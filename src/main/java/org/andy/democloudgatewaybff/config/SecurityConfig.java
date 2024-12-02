@@ -24,6 +24,9 @@ import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.LinkedHashMap;
 
@@ -39,16 +42,11 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         CookieCsrfTokenRepository cookieCsrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
         CsrfTokenRequestAttributeHandler csrfTokenRequestAttributeHandler = new CsrfTokenRequestAttributeHandler();
-		/*
-		IMPORTANT:
-		Set the csrfRequestAttributeName to null, to opt-out of deferred tokens, resulting in the CsrfToken to be loaded on every request.
-		If it does not exist, the CookieCsrfTokenRepository will automatically generate a new one and add the Cookie to the response.
-		See the reference: https://docs.spring.io/spring-security/reference/servlet/exploits/csrf.html#deferred-csrf-token
-		 */
         csrfTokenRequestAttributeHandler.setCsrfRequestAttributeName(null);
 
-        // @formatter:off
+        // Enable CORS and configure it explicitly
         http
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(authorize ->
                         authorize
                                 .anyRequest().authenticated()
@@ -58,22 +56,35 @@ public class SecurityConfig {
                                 .csrfTokenRepository(cookieCsrfTokenRepository)
                                 .csrfTokenRequestHandler(csrfTokenRequestAttributeHandler)
                 )
-                .cors(Customizer.withDefaults())
                 .exceptionHandling(exceptionHandling ->
                         exceptionHandling
                                 .authenticationEntryPoint(authenticationEntryPoint())
                 )
                 .oauth2Login(oauth2Login ->
                         oauth2Login
-                                .successHandler(new SimpleUrlAuthenticationSuccessHandler(this.appBaseUri)))
+                                .successHandler(new SimpleUrlAuthenticationSuccessHandler(this.appBaseUri))
+                )
                 .logout(logout ->
                         logout
                                 .addLogoutHandler(logoutHandler(cookieCsrfTokenRepository))
                                 .logoutSuccessHandler(new HttpStatusReturningLogoutSuccessHandler(HttpStatus.OK))
                 )
                 .oauth2Client(Customizer.withDefaults());
-        // @formatter:on
+
         return http.build();
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
+        config.addAllowedOrigin("http://127.0.0.1:3000");
+        config.addAllowedHeader("*");
+        config.addAllowedMethod("*");
+        config.setAllowCredentials(true);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
     }
 
     private AuthenticationEntryPoint authenticationEntryPoint() {
