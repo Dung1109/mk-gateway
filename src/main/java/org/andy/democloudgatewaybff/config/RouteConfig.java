@@ -8,13 +8,22 @@ import org.springframework.web.servlet.function.ServerResponse;
 import static org.springframework.cloud.gateway.server.mvc.filter.TokenRelayFilterFunctions.tokenRelay;
 import static org.springframework.cloud.gateway.server.mvc.handler.GatewayRouterFunctions.route;
 import static org.springframework.cloud.gateway.server.mvc.handler.HandlerFunctions.http;
+import static org.springframework.cloud.gateway.server.mvc.predicate.GatewayRequestPredicates.path;
 
 @Configuration
 public class RouteConfig {
+//    @Bean
+//    public RouterFunction<ServerResponse> gatewayRouterFunctionsAddReqHeader() {
+//        return route("secret")
+//                .GET("/secret", http("http://localhost:8081/secret"))
+//                .filter(tokenRelay())
+//                .build();
+//    }
+
     @Bean
     public RouterFunction<ServerResponse> gatewayRouterFunctionsAddReqHeader() {
         return route("secret")
-                .GET("/secret", http("http://localhost:8081/secret"))
+                .route(path("/**"), http("http://localhost:8081"))
                 .filter(tokenRelay())
                 .build();
     }
