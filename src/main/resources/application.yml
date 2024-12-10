@@ -24,7 +24,8 @@ spring:
                         client-secret: secret
                         authorization-grant-type: authorization_code
                         redirect-uri: "http://127.0.0.1:8080/login/oauth2/code/{registrationId}"
-                        scope: openid,profile,u.test
+                        scope: openid
+#                        ,profile,u.test
                         client-name: messaging-client-oidc
                     messaging-client-authorization-code:
                         provider: spring
@@ -37,25 +38,43 @@ spring:
                 provider:
                     spring:
                         issuer-uri: http://localhost:9000
-#    cloud:
-#        gateway:
-#            mvc:
-#                routes:
+    cloud:
+        gateway:
+            mvc:
+                routes:
 #                    -   id: userinfo
 #                        uri: http://localhost:9000
 #                        predicates:
 #                            - Path=/userinfo
 #                        filters:
 #                            - TokenRelay=
-#                    -   id: messages
-#                        uri: http://localhost:8081/secret
+                    -   id: messages
+                        uri: http://localhost:8081/secret
+                        predicates:
+                            - Path=/messages
+                        filters:
+                            - TokenRelay=
+                            - RelayTokenIfExists=messaging-client-authorization-code
+                    -   id: resource-server
+                        uri: http://localhost:8081
+                        predicates:
+                            - Path=/resource-server/**
+                        filters:
+                            - StripPrefix=1
+                            - TokenRelay=
+                            - RelayTokenIfExists=messaging-client-authorization-code
+#                    -   id: authorization-server
+#                        uri: http://localhost:9000
 #                        predicates:
-#                            - Path=/messages
+#                            - Path=/logout
 #                        filters:
 #                            - TokenRelay=
-
+#                            - RelayTokenIfExists=messaging-client-authorization-code
+#                            - DedupeResponseHeader=Access-Control-Allow-Origin
 
 app:
     #    base-uri: http://127.0.0.1:3000
     base-uri: http://127.0.0.1:3000
-#    base-uri: https://google.com
+    auth:
+        post-login-redirect: http://127.0.0.1:3000/postlogin
+        post-logout-redirect: http://127.0.0.1:3000/login

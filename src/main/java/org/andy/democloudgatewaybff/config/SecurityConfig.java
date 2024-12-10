@@ -3,21 +3,21 @@ package org.andy.democloudgatewaybff.config;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.oauth2.client.oidc.web.logout.OidcClientInitiatedLogoutSuccessHandler;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.DelegatingAuthenticationEntryPoint;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
-import org.springframework.security.web.authentication.logout.CompositeLogoutHandler;
-import org.springframework.security.web.authentication.logout.HttpStatusReturningLogoutSuccessHandler;
-import org.springframework.security.web.authentication.logout.LogoutHandler;
-import org.springframework.security.web.authentication.logout.SecurityContextLogoutHandler;
+import org.springframework.security.web.authentication.logout.*;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfLogoutHandler;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
@@ -38,8 +38,15 @@ public class SecurityConfig {
     @Value("${app.base-uri}")
     private String appBaseUri;
 
+    private static final String[] ALLOWED_URIS = {
+            "/logged-out",
+            "/actuator/health",
+            "/actuator/health/liveness",
+            "/actuator/health/readiness"
+    };
+
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, ClientRegistrationRepository clientRegistrationRepository) throws Exception {
         CookieCsrfTokenRepository cookieCsrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
         CsrfTokenRequestAttributeHandler csrfTokenRequestAttributeHandler = new CsrfTokenRequestAttributeHandler();
         csrfTokenRequestAttributeHandler.setCsrfRequestAttributeName(null);
@@ -49,12 +56,14 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(authorize ->
                         authorize
+                                .requestMatchers(ALLOWED_URIS).permitAll()
                                 .anyRequest().authenticated()
                 )
                 .csrf(csrf ->
                         csrf
                                 .csrfTokenRepository(cookieCsrfTokenRepository)
                                 .csrfTokenRequestHandler(csrfTokenRequestAttributeHandler)
+//                                csrf.disable()
                 )
                 .exceptionHandling(exceptionHandling ->
                         exceptionHandling
@@ -66,8 +75,12 @@ public class SecurityConfig {
                 )
                 .logout(logout ->
                         logout
-                                .addLogoutHandler(logoutHandler(cookieCsrfTokenRepository))
-                                .logoutSuccessHandler(new HttpStatusReturningLogoutSuccessHandler(HttpStatus.OK))
+                                .logoutUrl("/logout")
+//                                .addLogoutHandler(logoutHandler(cookieCsrfTokenRepository))
+//                                .logoutSuccessHandler(logoutSuccessHandler())
+//                                .logoutSuccessHandler(new HttpStatusReturningLogoutSuccessHandler(HttpStatus.OK))
+                                .logoutSuccessHandler(oidcLogoutSuccessHandler(clientRegistrationRepository))
+
                 )
                 .oauth2Client(Customizer.withDefaults());
 
@@ -77,9 +90,11 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
+        config.addAllowedHeader("X-XSRF-TOKEN");
+        config.addAllowedHeader(HttpHeaders.CONTENT_TYPE);
         config.addAllowedOrigin("http://127.0.0.1:3000");
-        config.addAllowedHeader("*");
-        config.addAllowedMethod("*");
+        config.addAllowedHeader("*"); // Allow all headers
+        config.addAllowedMethod("*"); // Allow all methods
         config.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
@@ -106,5 +121,23 @@ public class SecurityConfig {
         return new CompositeLogoutHandler(
                 new SecurityContextLogoutHandler(),
                 new CsrfLogoutHandler(csrfTokenRepository));
+    }
+
+    private LogoutSuccessHandler logoutSuccessHandler() {
+        SimpleUrlLogoutSuccessHandler logoutSuccessHandler = new SimpleUrlLogoutSuccessHandler();
+        logoutSuccessHandler.setDefaultTargetUrl("/logged-out");
+        return logoutSuccessHandler;
+    }
+
+    private LogoutSuccessHandler oidcLogoutSuccessHandler(ClientRegistrationRepository clientRegistrationRepository) {
+        OidcClientInitiatedLogoutSuccessHandler oidcLogoutSuccessHandler =
+                new OidcClientInitiatedLogoutSuccessHandler(clientRegistrationRepository);
+
+        // Set the location that the End-User's User Agent will be redirected to
+        // after the logout has been performed at the Provider
+        oidcLogoutSuccessHandler.setPostLogoutRedirectUri("{baseUrl}/logged-out");
+//        oidcLogoutSuccessHandler.setPostLogoutRedirectUri("https://google.com");
+
+        return oidcLogoutSuccessHandler;
     }
 }
