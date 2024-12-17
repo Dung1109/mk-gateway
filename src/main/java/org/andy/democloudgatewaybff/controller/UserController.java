@@ -38,7 +38,7 @@ public class UserController {
     @GetMapping("/username")
     public Map<String, String> username(Authentication authentication) {
         String username = authentication.getName();
-        log.info("username: {}",username);
+        log.info("username: {}",authentication.getAuthorities());
         return Map.of("username", username);
     }
 

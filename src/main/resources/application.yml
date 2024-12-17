@@ -9,6 +9,7 @@ logging:
         org.springframework.security.oauth2: INFO
 
 spring:
+
     threads:
       virtual:
           enabled: true
@@ -63,6 +64,16 @@ spring:
                             - StripPrefix=1
                             - TokenRelay=
                             - RelayTokenIfExists=messaging-client-authorization-code
+                    -   id: candidate-resource-server
+                        uri: http://localhost:8082
+                        predicates:
+                            - Path=/candidate-resource-server/**
+                        filters:
+                            - StripPrefix=1
+                            - TokenRelay=
+#                            - RelayTokenIfExists=messaging-client-authorization-code
+
+#                            - RelayTokenIfExists=messaging-client-authorization-code
 #                    -   id: authorization-server
 #                        uri: http://localhost:9000
 #                        predicates:
@@ -71,7 +82,6 @@ spring:
 #                            - TokenRelay=
 #                            - RelayTokenIfExists=messaging-client-authorization-code
 #                            - DedupeResponseHeader=Access-Control-Allow-Origin
-
 app:
     #    base-uri: http://127.0.0.1:3000
     base-uri: http://127.0.0.1:3000
